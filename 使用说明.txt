@@ -1,0 +1,72 @@
+== 57站多语言翻译工具 ==
+
+目录结构：
+  01_原始数据/   ← 放系统导出的Excel（或由export_from_api.py自动下载）
+  02_过程数据/   ← JSONL断点文件（自动生成，支持中断续跑）
+  03_产出/       ← 翻译后的Excel（直接用于上传）
+  04_代码/       ← 脚本文件
+  05_上传格式/   ← 最终分片文件（如需手动分片）
+
+────────────────────────────────────────
+Step 1：从文案系统导出数据
+────────────────────────────────────────
+
+  # 导出全部三类（前端key / 提示语 / 错误code），SHEIN品牌
+  python3 04_代码/export_from_api.py
+
+  # 只导缺某语种的key（老语种补充场景）
+  python3 04_代码/export_from_api.py --empty-langs da fi lv
+
+  # 只导某一类
+  python3 04_代码/export_from_api.py --type 1 --empty-langs da
+
+  导出文件自动保存到 01_原始数据/
+
+────────────────────────────────────────
+Step 2：翻译
+────────────────────────────────────────
+
+  # 老语种：只填空格（缺哪些补哪些），分站单独传
+  python3 04_代码/translate_multi_site.py --langs da
+  python3 04_代码/translate_multi_site.py --langs da fi lv
+
+  # 稳定快速模式（默认）：Google优先，空翻译/失败/PH错误自动用Dify兜底
+  python3 04_代码/translate_multi_site.py --langs fr it de --engine hybrid
+
+  # Google限流时可降低并发并拉大请求间隔
+  python3 04_代码/translate_multi_site.py --langs fr --engine hybrid --google-workers 2 --google-interval 0.8
+
+  # 只用Dify（更稳但通常更慢）
+  python3 04_代码/translate_multi_site.py --langs fr --engine dify --dify-workers 4
+
+  # 指定文件（某一个站的导出）
+  python3 04_代码/translate_multi_site.py 01_原始数据/frontend_key_20260608.xlsx --langs da
+
+  # 新语种：全量模式（不管已有内容都翻译）
+  python3 04_代码/translate_multi_site.py --langs lt lv et ka --all
+
+  产出保存到 03_产出/
+
+────────────────────────────────────────
+质量红线（脚本已内置）
+────────────────────────────────────────
+
+  1. EN列不可修改：脚本不回写EN列，回填后自动校验，不一致会打警告
+  2. EN文本以 = + - @ 开头时，强制写入文本格式，防Excel公式解析
+  3. 占位符数量不一致（PH_MISMATCH）：硬性阻断，不写入产出，记录到JSONL等待重译
+  4. 空翻译（EMPTY）：硬性阻断，产出Excel对应格标红并写入 _QC_issues sheet
+
+────────────────────────────────────────
+断点续跑
+────────────────────────────────────────
+
+  中断后直接重新运行相同命令即可，JSONL已记录完成的翻译，跳过已成功的EN文本。
+
+────────────────────────────────────────
+注意事项
+────────────────────────────────────────
+
+  - 老语种缺失的key各站不同，需分站导出、分站上传
+  - 新语种（8个）所有站key相同，翻译一次后可合并上传
+  - 单次导出上限5000条，超过自动分批（part1, part2...）
+  - 默认Dify并发为6；如遇频繁429限流，可用 --dify-workers / --google-workers / --google-interval 调低速率

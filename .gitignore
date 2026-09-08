@@ -1,0 +1,20 @@
+.DS_Store
+__pycache__/
+.pycache_tmp/
+*.py[cod]
+.venv/
+venv/
+node_modules
+
+# 运行时数据与历史产物不入库。Code Agent 执行时会重新生成这些目录。
+01_原始数据/
+02_过程数据/
+03_产出/
+03_分析报告/
+05_上传格式/
+outputs/
+
+# 本地密钥与临时配置
+.env
+.env.*
+!.env.example
